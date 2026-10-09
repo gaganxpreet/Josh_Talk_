@@ -1,0 +1,7 @@
+# Dukaan Bench - generation dependencies
+#
+# You only need the SDK for the models you intend to call via API.
+# The manual (web UI) path needs nothing beyond the Python standard library.
+
+openai>=1.40.0          # OpenAI - GPT Image 1
+google-genai>=0.3.0     # Google - Gemini 2.5 / 3.1 Flash Image

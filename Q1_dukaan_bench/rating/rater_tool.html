@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dukaan Bench — Rating Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700&family=Noto+Sans+Tamil:wght@400;700&family=Noto+Sans+Bengali:wght@400;700&family=Noto+Sans+Gurmukhi:wght@400;700&family=Noto+Sans+Telugu:wght@400;700&family=Noto+Nastaliq+Urdu:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0E1116; --surface:#161B22; --surface2:#1C232D; --line:#2A3340;
+  --text:#E6EDF3; --muted:#8B99A8; --dim:#5E6B7A;
+  --accent:#4C8DFF; --good:#2EA86B; --warn:#D9A441; --bad:#E05252;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:Inter,'Noto Sans Devanagari','Noto Sans Tamil','Noto Sans Bengali','Noto Sans Gurmukhi','Noto Sans Telugu','Noto Nastaliq Urdu',system-ui,sans-serif;
+  font-size:14px; line-height:1.5;
+}
+.wrap{max-width:1280px;margin:0 auto;padding:20px}
+h1{font-size:20px;margin:0 0 2px}
+h2{font-size:16px;margin:0 0 10px}
+.sub{color:var(--muted);font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+label.fld{display:block;margin-bottom:10px;font-size:13px;color:var(--muted)}
+input[type=text],input[type=number],textarea,select{
+  width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);
+  border-radius:7px;padding:8px 10px;font-family:inherit;font-size:14px;margin-top:4px
+}
+textarea{resize:vertical;min-height:52px}
+button{
+  background:var(--accent);color:#fff;border:0;border-radius:7px;padding:9px 16px;
+  font-family:inherit;font-size:14px;font-weight:600;cursor:pointer
+}
+button:disabled{background:var(--surface2);color:var(--dim);cursor:not-allowed}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+button.ghost:hover{border-color:var(--accent)}
+.hint{font-size:12px;color:var(--dim);margin-top:6px}
+.warnbox{background:rgba(217,164,65,.1);border:1px solid rgba(217,164,65,.35);border-radius:8px;padding:12px;font-size:13px;margin-bottom:14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{
+  border:1px solid var(--line);background:var(--bg);color:var(--muted);
+  border-radius:20px;padding:5px 11px;font-size:12px;cursor:pointer;user-select:none
+}
+.chip.on{background:rgba(76,141,255,.16);border-color:var(--accent);color:var(--text)}
+.chip.tag.on{background:rgba(224,82,82,.15);border-color:var(--bad);color:#ffd9d9}
+
+/* progress */
+.pbar{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin:10px 0 16px}
+.pbar i{display:block;height:100%;background:var(--accent);transition:width .25s}
+
+/* triad */
+.triad{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1000px){.triad{grid-template-columns:1fr}}
+.pane{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.pane.pick{border-color:var(--good);box-shadow:0 0 0 1px var(--good) inset}
+.pane h3{margin:0;padding:9px 12px;background:var(--surface2);font-size:13px;border-bottom:1px solid var(--line);
+  display:flex;justify-content:space-between;align-items:center}
+.imgbox{background:#000;aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;position:relative;cursor:zoom-in}
+.imgbox img{width:100%;height:100%;object-fit:contain}
+.ph{color:var(--dim);font-size:12px;text-align:center;padding:20px}
+.body{padding:12px;display:flex;flex-direction:column;gap:12px}
+.axis{border-top:1px solid var(--line);padding-top:10px}
+.axis:first-child{border-top:0;padding-top:0}
+.axis .lab{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.axis .lab b{font-size:12px;letter-spacing:.02em}
+.axis .lab span{font-size:11px;color:var(--dim)}
+.scale{display:flex;gap:5px}
+.scale button{
+  flex:1;background:var(--bg);border:1px solid var(--line);color:var(--muted);
+  padding:7px 0;font-weight:600;font-size:13px;border-radius:6px
+}
+.scale button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.scale button.skip{flex:2.2;font-size:11px;font-weight:500}
+.scale button.skip.on{background:var(--dim);border-color:var(--dim)}
+.yn{display:flex;gap:6px}
+.yn button{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--muted);padding:8px 0;border-radius:6px;font-weight:600}
+.yn button.on.yes{background:var(--good);border-color:var(--good);color:#fff}
+.yn button.on.no{background:var(--bad);border-color:var(--bad);color:#fff}
+
+/* target text */
+.target{background:var(--surface2);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:8px;padding:12px 14px;margin-bottom:14px}
+.target .t{font-size:26px;font-weight:700;line-height:1.7;letter-spacing:.01em}
+.target .g{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* rubric drawer */
+details.rub{margin-bottom:14px}
+details.rub summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;list-style:none}
+details.rub summary::-webkit-details-marker{display:none}
+details.rub summary:before{content:"▸ ";transition:.2s}
+details.rub[open] summary:before{content:"▾ "}
+.rubgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+@media(max-width:900px){.rubgrid{grid-template-columns:1fr}}
+.rubcol{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:11px;font-size:12px}
+.rubcol b{display:block;margin-bottom:6px;font-size:12px}
+.rubcol dl{margin:0}
+.rubcol dt{color:var(--accent);font-weight:700;margin-top:6px;font-size:11px}
+.rubcol dd{margin:1px 0 0;color:var(--muted);font-size:11.5px;line-height:1.4}
+
+/* lightbox */
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.93);display:none;align-items:center;justify-content:center;z-index:99;cursor:zoom-out}
+#lb img{max-width:94vw;max-height:94vh;object-fit:contain}
+
+.navbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px}
+.hidden{display:none}
+code.k{background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============ SETUP ============ -->
+<section id="setup">
+  <div class="card">
+    <h1>Dukaan Bench — Rating Tool</h1>
+    <p class="sub">Blinded comparison of AI-generated posters for Indian small businesses. ~20 minutes.</p>
+  </div>
+
+  <div class="warnbox">
+    <b>Organiser setup — do this before handing the laptop to a rater.</b><br>
+    Load the <code class="k">images/</code> folder below. Model names are hidden from the rater automatically;
+    position and prompt order are randomised from the rater ID, so the same ID always reproduces the same session.
+    <br><br>
+    If Indic text below renders as empty boxes <code class="k">□□□</code>, install the Noto fonts for that script
+    before rating — you cannot judge spelling you cannot see.
+  </div>
+
+  <div class="card">
+    <h2>1. Load images</h2>
+    <label class="fld">Select the <code class="k">Q1_dukaan_bench/images</code> folder
+      <input type="file" id="dirpick" webkitdirectory directory multiple>
+    </label>
+    <div class="hint" id="loadstat">No images loaded — the tool will run in placeholder mode so you can preview the flow.</div>
+  </div>
+
+  <div class="card">
+    <h2>2. Rater details</h2>
+    <div class="row">
+      <div style="flex:1;min-width:180px"><label class="fld">Participant ID <input type="text" id="rid" placeholder="R01"></label></div>
+      <div style="flex:2;min-width:220px"><label class="fld">Full name <input type="text" id="rname" placeholder="As on the consent form"></label></div>
+      <div style="flex:2;min-width:220px"><label class="fld">Email <input type="text" id="remail"></label></div>
+      <div style="flex:1;min-width:110px"><label class="fld">Age <input type="number" id="rage" min="18"></label></div>
+      <div style="flex:1;min-width:160px"><label class="fld">City / State <input type="text" id="rcity"></label></div>
+    </div>
+
+    <label class="fld" style="margin-top:6px">Scripts you read <b>natively</b> — this decides which spelling questions you'll be asked</label>
+    <div class="chips" id="scripts"></div>
+
+    <label class="fld" style="margin-top:14px">Have you run / worked in / helped with a family small business?
+      <select id="rbiz"><option value="">—</option><option value="yes">Yes</option><option value="no">No</option></select>
+    </label>
+
+    <div class="warnbox" style="margin-top:14px">
+      <b>Consent</b> — tick to confirm. The signed form must already be collected.<br><br>
+      <label><input type="checkbox" id="rconsent"> I confirm that I am 18 years or older. I voluntarily participated in
+      this evaluation. I consent to my name, email, and responses/ratings being included in this assignment
+      submission for hiring evaluation purposes.</label>
+    </div>
+
+    <button id="start" disabled>Start rating</button>
+    <div class="hint" id="startmsg"></div>
+  </div>
+</section>
+
+<!-- ============ RATING ============ -->
+<section id="rate" class="hidden">
+  <div class="card" style="padding:14px 18px">
+    <div class="row" style="justify-content:space-between">
+      <div><b id="screenTitle">Screen 1 of 11</b> <span class="sub" id="screenMeta"></span></div>
+      <button class="ghost" id="saveExit">Save &amp; export</button>
+    </div>
+    <div class="pbar"><i id="pbar" style="width:0%"></i></div>
+    <div class="sub" id="brief"></div>
+  </div>
+
+  <div class="target" id="target"></div>
+
+  <details class="rub">
+    <summary>Show the scoring guide</summary>
+    <div class="rubgrid">
+      <div class="rubcol"><b>TEXT — is the spelling right?</b><dl>
+        <dt>3 — Perfect</dt><dd>Every character correct and readable. A native reader sees nothing wrong.</dd>
+        <dt>2 — Minor flaw</dt><dd>One wrong/missing matra or odd spacing. Meaning still instantly clear.</dd>
+        <dt>1 — Wrong</dt><dd>Misspelt, dropped/duplicated characters, broken conjuncts — or correct but cut off.</dd>
+        <dt>0 — Fake script</dt><dd>Shapes that look like the script but aren't real letters, wrong script, or no text.</dd>
+        <dt>Can't read</dt><dd>Use this freely. Guessing is worse than skipping.</dd>
+      </dl></div>
+      <div class="rubcol"><b>INDIA — does it look real?</b><dl>
+        <dt>3 — Authentic</dt><dd>Looks like the actual Indian setting described. Products, clothing, lighting all plausible.</dd>
+        <dt>2 — Broadly Indian</dt><dd>Recognisably Indian but details are off, or too tidy/affluent for the business.</dd>
+        <dt>1 — Motifs on top</dt><dd>Generic international image with Indian decoration added. "AI's idea of India."</dd>
+        <dt>0 — Wrong or stereotyped</dt><dd>Not India at all, or the <b>Rajasthan default</b> — camels/forts/turbans pasted onto a Chennai or Kolkata shop.</dd>
+      </dl></div>
+      <div class="rubcol"><b>POSTER — does it work?</b><dl>
+        <dd style="margin-bottom:6px"><i>Ignore spelling here — that's the text score.</i></dd>
+        <dt>3 — Professional</dt><dd>Clear hierarchy, good contrast, readable as a phone thumbnail.</dd>
+        <dt>2 — Decent</dt><dd>Slightly cramped or cluttered, but usable.</dd>
+        <dt>1 — Problems</dt><dd>Elements cut off, low contrast, busy background behind text.</dd>
+        <dt>0 — Unusable</dt><dd>Chaotic, or obvious artefacts in a prominent place.</dd>
+      </dl></div>
+    </div>
+  </details>
+
+  <div class="triad" id="triad"></div>
+
+  <div class="card" style="margin-top:14px">
+    <h2 style="margin-bottom:4px">Which one would you actually use?</h2>
+    <p class="sub" style="margin:0 0 10px">Imagine this is your shop. Pick the one you'd post — or say none of them are good enough.
+      <b>“None of these” is a real answer, not a cop-out.</b></p>
+    <div class="chips" id="h2h"></div>
+    <label class="fld" style="margin-top:12px">Anything you want to add? (optional)
+      <textarea id="comment" placeholder="e.g. 'B's Hindi is close but the आ is wrong', 'none of these look like a shop near me'"></textarea>
+    </label>
+  </div>
+
+  <div class="navbar">
+    <button class="ghost" id="prev">← Back</button>
+    <div class="sub" id="valmsg"></div>
+    <button id="next">Next →</button>
+  </div>
+</section>
+
+<!-- ============ DONE ============ -->
+<section id="done" class="hidden">
+  <div class="card">
+    <h1>Done — thank you</h1>
+    <p class="sub">Your ratings are below. Export the CSV and send it to the organiser.</p>
+    <div class="row" style="margin-top:12px">
+      <button id="dl">Download ratings CSV</button>
+      <button class="ghost" id="dlp">Download participant row</button>
+      <button class="ghost" id="again">Rate as a different participant</button>
+    </div>
+    <div class="hint">Files save as <code class="k">ratings_&lt;ID&gt;.csv</code> and <code class="k">participant_&lt;ID&gt;.csv</code>.
+      The organiser concatenates everyone's files before running <code class="k">analyze.py</code>.</div>
+  </div>
+  <div class="card"><h2>Preview</h2><div style="overflow:auto;max-height:420px"><table id="prev"></table></div></div>
+</section>
+
+<div id="lb"><img id="lbimg" alt=""></div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------------
+   Dukaan Bench rating tool.
+
+   Runs entirely offline from a double-clicked file. Nothing is uploaded.
+
+   Blinding: the rater never sees a model name. Panes are A/B/C, and the
+   mapping from pane -> model is drawn from a PRNG seeded by the participant
+   ID, so (a) every rater sees a different arrangement and position bias
+   cancels out across the panel, and (b) any session can be reproduced
+   exactly from the ID alone, which matters if a result is ever questioned.
+--------------------------------------------------------------------------- */
+
+const MODELS = [
+  {key:'gpt_image_1',                   company:'OpenAI', name:'GPT Image 1'},
+  {key:'gemini_2_5_flash_image',        company:'Google', name:'Gemini 2.5 Flash Image'},
+  {key:'gemini_3_1_flash_image_preview',company:'Google', name:'Gemini 3.1 Flash Image Preview'},
+];
+
+/* Mirrors prompts/prompt_set_v1.json. Kept inline so the tool works from
+   file:// where fetch() of a sibling file is blocked by CORS. */
+const PROMPTS = [
+  {id:'P01',script:'Devanagari',lang:'Hindi',biz:'Kirana (grocery) store',occ:'Diwali',
+   text:['दिवाली धमाका','50% छूट'],gloss:'“Diwali Dhamaka” (Diwali Blast) and “50% chhoot” (50% discount)'},
+  {id:'P02',script:'Devanagari',lang:'Hindi',biz:'Traditional sweet shop',occ:'Diwali / festive',
+   text:['मिष्ठान्न भंडार','ताज़ा मिठाई'],gloss:'“Mishthann Bhandar” (Sweets Emporium) and “Taaza Mithai” (Fresh Sweets)'},
+  {id:'P03',script:'Devanagari',lang:'Hindi + English',biz:'Ladies beauty salon',occ:'Wedding season',
+   text:['Bridal Makeup','शादी स्पेशल','₹2999 से'],gloss:'“Bridal Makeup”, “Shaadi Special”, “from ₹2999”'},
+  {id:'P04',script:'Devanagari',lang:'Hindi',biz:'Mobile repair shop',occ:'Service offer',
+   text:['मोबाइल रिपेयरिंग','30 मिनट में'],gloss:'“Mobile Repairing” and “in 30 minutes”'},
+  {id:'P05',script:'Tamil',lang:'Tamil',biz:'Textile / saree shop',occ:'Pongal',
+   text:['பொங்கல் சிறப்பு சலுகை'],gloss:'“Pongal Sirappu Salugai” (Pongal Special Offer)'},
+  {id:'P06',script:'Bengali',lang:'Bengali',biz:'Clothing store, Kolkata',occ:'Durga Puja',
+   text:['পূজা স্পেশাল','৫০% ছাড়'],gloss:'“Pujo Special” and “50% discount” — note the numerals must be Bengali ৫০, not 50'},
+  {id:'P07',script:'Gurmukhi',lang:'Punjabi',biz:'Roadside dhaba',occ:'Baisakhi',
+   text:['ਵਿਸਾਖੀ ਦੀਆਂ ਵਧਾਈਆਂ'],gloss:'“Visakhi diyan vadhaiyan” (Baisakhi greetings)'},
+  {id:'P08',script:'Telugu',lang:'Telugu',biz:'Electronics / appliance shop',occ:'Ugadi',
+   text:['ఉగాది ఆఫర్'],gloss:'“Ugadi Offer”'},
+  {id:'P09',script:'Urdu',lang:'Urdu',biz:'Bakery / biryani shop',occ:'Eid',
+   text:['عید مبارک'],gloss:'“Eid Mubarak” — right-to-left Nastaliq script'},
+  {id:'P10',script:'Latin',lang:'English',biz:'Kirana (grocery) store',occ:'Diwali',
+   text:['DIWALI DHAMAKA','50% OFF'],gloss:'English control — deliberately the same poster as the first screen, in English'},
+];
+
+const SCRIPTS = ['Devanagari','Tamil','Bengali','Gurmukhi','Telugu','Urdu','Latin'];
+const CA_TAGS = ['rajasthan-default','wrong-region','wrong-festival-iconography',
+                 'non-indian-faces','implausibly-affluent','stereotyped-poverty'];
+
+/* seeded PRNG so a participant ID fully determines their session */
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function shuffle(a,r){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+let IMAGES = {};          // "P01__model__run1" -> objectURL
+let state  = null;
+
+/* ---------- setup screen ---------- */
+const $ = id => document.getElementById(id);
+const chosenScripts = new Set();
+
+$('scripts').innerHTML = SCRIPTS.map(s=>`<div class="chip" data-s="${s}">${s}</div>`).join('');
+$('scripts').onclick = e => {
+  const c = e.target.closest('.chip'); if(!c) return;
+  const s = c.dataset.s;
+  chosenScripts.has(s) ? chosenScripts.delete(s) : chosenScripts.add(s);
+  c.classList.toggle('on'); validate();
+};
+
+$('dirpick').onchange = e => {
+  IMAGES = {}; let n = 0;
+  for (const f of e.target.files){
+    if(!/\.(png|jpe?g|webp)$/i.test(f.name)) continue;
+    IMAGES[f.name.replace(/\.[^.]+$/,'')] = URL.createObjectURL(f); n++;
+  }
+  const need = PROMPTS.length * MODELS.length;
+  $('loadstat').innerHTML = n
+    ? `Loaded <b>${n}</b> image(s). ${n < need
+        ? `<span style="color:var(--warn)">Expected ${need} for a full run — missing cells show as placeholders.</span>`
+        : '<span style="color:var(--good)">Full coverage.</span>'}`
+    : 'No matching images found in that folder.';
+};
+
+['rid','rname','remail','rage','rcity'].forEach(i=>$(i).oninput=validate);
+$('rbiz').onchange = validate; $('rconsent').onchange = validate;
+
+function validate(){
+  const ok = $('rid').value.trim() && $('rname').value.trim() && $('remail').value.trim()
+          && +$('rage').value >= 18 && $('rconsent').checked && chosenScripts.size > 0;
+  $('start').disabled = !ok;
+  const msgs = [];
+  if(+$('rage').value && +$('rage').value < 18) msgs.push('Participants must be 18 or older.');
+  if(!chosenScripts.size) msgs.push('Select at least one script you read.');
+  if(!$('rconsent').checked) msgs.push('Consent is required.');
+  $('startmsg').textContent = msgs.join(' ');
+}
+
+$('start').onclick = () => {
+  const rid = $('rid').value.trim();
+  const r = rng(hash(rid));
+
+  /* Screen order is randomised, then P01 is appended again as a hidden
+     within-rater consistency check (same prompt, re-randomised positions). */
+  const order = shuffle(PROMPTS.map(p=>p.id), r);
+  order.push('P01');
+
+  const screens = order.map((pid,i)=>({
+    pid, dup:i===order.length-1,
+    panes: shuffle(MODELS.map(m=>m.key), rng(hash(rid+pid+i))),
+    scores:{}, h2h:null, comment:'', t0:null, secs:0
+  }));
+
+  state = {
+    rid, name:$('rname').value.trim(), email:$('remail').value.trim(),
+    age:$('rage').value, city:$('rcity').value.trim(),
+    scripts:[...chosenScripts], biz:$('rbiz').value,
+    started:new Date().toISOString(), i:0, screens
+  };
+  $('setup').classList.add('hidden'); $('rate').classList.remove('hidden');
+  render();
+};
+
+/* ---------- rating screen ---------- */
+function render(){
+  const s = state.screens[state.i];
+  const p = PROMPTS.find(x=>x.id===s.pid);
+  const n = state.screens.length;
+  s.t0 = performance.now();
+
+  $('screenTitle').textContent = `Screen ${state.i+1} of ${n}`;
+  $('screenMeta').textContent  = `· ${p.biz} · ${p.occ}`;
+  $('pbar').style.width = ((state.i)/n*100)+'%';
+  $('brief').innerHTML = `The instruction given to all three AIs asked for a poster for a
+    <b>${p.biz.toLowerCase()}</b> for <b>${p.occ}</b>, showing this exact text:`;
+
+  const canRead = state.scripts.includes(p.script);
+  $('target').innerHTML =
+    `<div class="t">${p.text.map(t=>escapeHtml(t)).join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>
+     <div class="g">${escapeHtml(p.gloss)}</div>` +
+    (canRead ? '' : `<div class="g" style="color:var(--warn);margin-top:7px">
+       You didn't list ${p.script} as a script you read — please use <b>“Can't read”</b> for the
+       spelling question rather than guessing. Still score the other two.</div>`);
+
+  $('triad').innerHTML = s.panes.map((mk,idx)=>{
+    const letter = 'ABC'[idx];
+    const iid = `${p.id}__${mk}__run1`;
+    const url = IMAGES[iid];
+    const sc  = s.scores[letter] || {};
+    const img = url
+      ? `<img src="${url}" alt="Option ${letter}" data-full="${url}">`
+      : `<div class="ph">No image loaded<br><code class="k">${iid}</code><br><br>placeholder mode</div>`;
+    const btn = (ax,v,lbl,cls='') =>
+      `<button class="${cls} ${sc[ax]===v?'on':''}" data-p="${letter}" data-ax="${ax}" data-v="${v}">${lbl}</button>`;
+    return `<div class="pane ${s.h2h===letter?'pick':''}">
+      <h3><span>Option ${letter}</span></h3>
+      <div class="imgbox">${img}</div>
+      <div class="body">
+        <div class="axis">
+          <div class="lab"><b>TEXT</b><span>is the spelling right?</span></div>
+          <div class="scale">
+            ${btn('tf',0,'0')}${btn('tf',1,'1')}${btn('tf',2,'2')}${btn('tf',3,'3')}
+            ${btn('tf',-1,"Can't read",'skip')}
+          </div>
+        </div>
+        <div class="axis">
+          <div class="lab"><b>INDIA</b><span>does it look real?</span></div>
+          <div class="scale">${btn('ca',0,'0')}${btn('ca',1,'1')}${btn('ca',2,'2')}${btn('ca',3,'3')}</div>
+          <div class="chips" style="margin-top:7px">
+            ${CA_TAGS.map(t=>`<div class="chip tag ${(sc.tags||[]).includes(t)?'on':''}"
+                 data-p="${letter}" data-tag="${t}">${t}</div>`).join('')}
+          </div>
+        </div>
+        <div class="axis">
+          <div class="lab"><b>POSTER</b><span>composition, ignore spelling</span></div>
+          <div class="scale">${btn('cu',0,'0')}${btn('cu',1,'1')}${btn('cu',2,'2')}${btn('cu',3,'3')}</div>
+        </div>
+        <div class="axis">
+          <div class="lab"><b>POST IT?</b><span>as-is, no editing</span></div>
+          <div class="yn">
+            <button class="yes ${sc.upr===1?'on':''}" data-p="${letter}" data-ax="upr" data-v="1">Yes</button>
+            <button class="no  ${sc.upr===0?'on':''}" data-p="${letter}" data-ax="upr" data-v="0">No</button>
+          </div>
+        </div>
+      </div></div>`;
+  }).join('');
+
+  $('h2h').innerHTML = ['A','B','C'].map(l=>
+      `<div class="chip ${s.h2h===l?'on':''}" data-h="${l}" style="padding:9px 20px">Option ${l}</div>`).join('')
+    + `<div class="chip ${s.h2h==='none'?'on':''}" data-h="none" style="padding:9px 20px">None of these</div>`;
+
+  $('comment').value = s.comment || '';
+  $('prev').disabled = state.i === 0;
+  $('next').textContent = state.i === n-1 ? 'Finish' : 'Next →';
+  $('valmsg').textContent = '';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+$('triad').onclick = e => {
+  const s = state.screens[state.i];
+  const b = e.target.closest('button[data-ax]');
+  if(b){
+    const sc = s.scores[b.dataset.p] = s.scores[b.dataset.p] || {};
+    sc[b.dataset.ax] = +b.dataset.v;
+    return render();
+  }
+  const t = e.target.closest('.chip[data-tag]');
+  if(t){
+    const sc = s.scores[t.dataset.p] = s.scores[t.dataset.p] || {};
+    sc.tags = sc.tags || [];
+    const i = sc.tags.indexOf(t.dataset.tag);
+    i >= 0 ? sc.tags.splice(i,1) : sc.tags.push(t.dataset.tag);
+    return render();
+  }
+  const im = e.target.closest('img[data-full]');
+  if(im){ $('lbimg').src = im.dataset.full; $('lb').style.display = 'flex'; }
+};
+$('lb').onclick = () => $('lb').style.display = 'none';
+
+$('h2h').onclick = e => {
+  const c = e.target.closest('.chip[data-h]'); if(!c) return;
+  state.screens[state.i].h2h = c.dataset.h; render();
+};
+$('comment').oninput = e => state.screens[state.i].comment = e.target.value;
+
+$('prev').onclick = () => { commit(); if(state.i>0){ state.i--; render(); } };
+
+$('next').onclick = () => {
+  const s = state.screens[state.i];
+  const p = PROMPTS.find(x=>x.id===s.pid);
+  const canRead = state.scripts.includes(p.script);
+  const miss = [];
+  for(const l of ['A','B','C']){
+    const sc = s.scores[l] || {};
+    if(sc.tf === undefined) miss.push(`${l}: text`);
+    if(sc.ca === undefined) miss.push(`${l}: India`);
+    if(sc.cu === undefined) miss.push(`${l}: poster`);
+    if(sc.upr === undefined) miss.push(`${l}: post it?`);
+    if(!canRead && sc.tf > -1 && sc.tf !== undefined)
+      miss.push(`${l}: use "Can't read" for ${p.script}`);
+  }
+  if(!s.h2h) miss.push('which one you\'d use');
+  if(miss.length){ $('valmsg').innerHTML =
+    `<span style="color:var(--warn)">Still needed — ${miss.slice(0,4).join(', ')}${miss.length>4?'…':''}</span>`;
+    return; }
+
+  commit();
+  if(state.i < state.screens.length-1){ state.i++; render(); } else finish();
+};
+
+function commit(){
+  const s = state.screens[state.i];
+  if(s.t0) s.secs += Math.round((performance.now()-s.t0)/1000);
+  s.t0 = null;
+}
+
+$('saveExit').onclick = () => { commit(); finish(); };
+
+/* ---------- export ---------- */
+function rows(){
+  const out = [];
+  state.screens.forEach((s,si)=>{
+    const p = PROMPTS.find(x=>x.id===s.pid);
+    s.panes.forEach((mk,idx)=>{
+      const l = 'ABC'[idx], sc = s.scores[l] || {};
+      out.push({
+        rater_id:state.rid, screen_index:si+1, is_duplicate_check:s.dup?1:0,
+        prompt_id:p.id, script:p.script, language:p.lang,
+        position:l, image_id:`${p.id}__${mk}__run1`,
+        model_key:mk,                                   // revealed only at export
+        tf: sc.tf === -1 ? '' : (sc.tf ?? ''),
+        tf_skipped_cannot_read: sc.tf === -1 ? 1 : 0,
+        ca: sc.ca ?? '', cu: sc.cu ?? '', upr: sc.upr ?? '',
+        ca_tags:(sc.tags||[]).join('|'),
+        h2h_winner: s.h2h === l ? 1 : 0,
+        h2h_choice: s.h2h,
+        screen_seconds:s.secs,
+        comment: idx === 0 ? (s.comment||'') : ''
+      });
+    });
+  });
+  return out;
+}
+function toCSV(rs){
+  if(!rs.length) return '';
+  const h = Object.keys(rs[0]);
+  const esc = v => { v = v===null||v===undefined?'':String(v);
+    return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  return [h.join(','), ...rs.map(r=>h.map(k=>esc(r[k])).join(','))].join('\n');
+}
+function dl(name, txt){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(["﻿"+txt],{type:'text/csv;charset=utf-8'}));
+  a.download = name; a.click();
+}
+
+function finish(){
+  $('rate').classList.add('hidden'); $('done').classList.remove('hidden');
+  const rs = rows();
+  const head = ['prompt','pos','model (hidden during rating)','TF','CA','CU','post?','winner'];
+  $('prev').innerHTML = `<tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>` +
+    rs.map(r=>`<tr><td>${r.prompt_id}</td><td>${r.position}</td><td>${r.model_key}</td>
+      <td>${r.tf_skipped_cannot_read?'—':r.tf}</td><td>${r.ca}</td><td>${r.cu}</td>
+      <td>${r.upr==1?'Yes':'No'}</td><td>${r.h2h_winner?'★':''}</td></tr>`).join('');
+  $('dl').onclick  = () => dl(`ratings_${state.rid}.csv`, toCSV(rs));
+  $('dlp').onclick = () => dl(`participant_${state.rid}.csv`, toCSV([{
+    participant_id:state.rid, name:state.name, email:state.email, age:state.age,
+    city_state:state.city, scripts_read:state.scripts.join('|'),
+    small_business_experience:state.biz, consent_given:'yes',
+    consent_statement:'I confirm that I am 18 years or older. I voluntarily participated in this evaluation. I consent to my name, email, and responses/ratings being included in this assignment submission for hiring evaluation purposes.',
+    started_at:state.started, completed_at:new Date().toISOString(),
+    total_seconds:state.screens.reduce((a,s)=>a+s.secs,0)
+  }]));
+}
+$('again').onclick = () => location.reload();
+</script>
+</body>
+</html>

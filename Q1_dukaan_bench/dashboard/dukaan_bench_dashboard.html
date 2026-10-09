@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dukaan Bench — Leaderboard</title>
+<!--
+  Dukaan Bench dashboard / leaderboard prototype.
+
+  PALETTE PROVENANCE
+  Categorical slots are the dataviz reference palette's first three slots,
+  used unchanged: blue #2a78d6, orange #eb6834, aqua #1baf7a. palette.md
+  records these three as all-pairs validated in both light and dark modes
+  (worst-pair CVD dE 9.2 light / 9.4 dark; normal-vision 24.0 / 20.9).
+  "None of these" is drawn in neutral ink, not a 4th hue, because it is the
+  ABSENCE of a usable model rather than a fourth competitor.
+  Aqua sits below 3:1 on the light surface, so the relief rule applies:
+  every chart ships direct labels AND a table view.
+
+  Sequential heatmap uses the single blue ramp, light->dark. No rainbow.
+  No dual-axis chart anywhere. One filter row, above everything it scopes.
+-->
+<style>
+:root{
+  color-scheme:light;
+  --page:#f9f9f7; --surface:#fcfcfb;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --q100:#cde2fb; --q200:#9ec5f4; --q300:#6da7ec; --q400:#3987e5;
+  --q500:#256abf; --q600:#184f95; --q700:#0d366b;
+}
+@media(prefers-color-scheme:dark){
+  :root:where(:not([data-theme=light])){
+    color-scheme:dark;
+    --page:#0d0d0d; --surface:#1a1a19;
+    --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  }
+}
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --page:#0d0d0d; --surface:#1a1a19;
+  --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 20px 60px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:6px}
+h1{font-size:23px;margin:0;letter-spacing:-.01em}
+.tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;
+  color:var(--s1);border:1px solid var(--s1);border-radius:4px;padding:2px 7px;vertical-align:3px;margin-left:8px}
+.lede{color:var(--ink2);max-width:72ch;margin:6px 0 0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 3px;letter-spacing:-.005em}
+.card .cap{font-size:12.5px;color:var(--muted);margin:0 0 16px;max-width:78ch}
+.banner{border-radius:10px;padding:13px 16px;font-size:13px;margin-bottom:16px;
+  background:rgba(250,178,25,.12);border:1px solid rgba(250,178,25,.45)}
+.banner b{color:var(--ink)}
+
+/* filter row — one row, above everything it scopes */
+.filters{display:flex;gap:16px;align-items:center;flex-wrap:wrap;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 18px;margin-bottom:16px}
+.filters .lbl{font-size:12px;color:var(--muted);font-weight:600}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{background:transparent;border:1px solid var(--border);color:var(--ink2);
+  border-radius:16px;padding:5px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
+.seg button.on{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:600}
+.spacer{flex:1}
+.tbtn{background:transparent;border:1px solid var(--border);color:var(--ink2);
+  border-radius:7px;padding:6px 11px;font-size:12.5px;font-family:inherit;cursor:pointer}
+
+/* stat tiles — the number IS the chart */
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+@media(max-width:880px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.tile .k{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.tile .v{font-size:33px;font-weight:700;letter-spacing:-.02em;margin:5px 0 1px;line-height:1.05}
+.tile .n{font-size:12px;color:var(--ink2)}
+
+svg{display:block;width:100%;overflow:visible}
+.gl{stroke:var(--grid);stroke-width:1}
+.ax{stroke:var(--axis);stroke-width:1}
+.tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.catlab{fill:var(--ink);font-size:12.5px}
+.sublab{fill:var(--muted);font-size:11px}
+.vlab{fill:var(--ink);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.hit{fill:transparent;cursor:pointer}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 14px;font-size:12.5px;color:var(--ink2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+#tip{position:fixed;z-index:50;pointer-events:none;opacity:0;transition:opacity .1s;
+  background:var(--surface);border:1px solid var(--border);border-radius:9px;
+  padding:9px 12px;font-size:12.5px;box-shadow:0 8px 28px rgba(0,0,0,.3);max-width:280px}
+#tip b{display:block;margin-bottom:3px;font-size:12.5px}
+#tip .r{color:var(--ink2);display:flex;justify-content:space-between;gap:14px}
+#tip .r span:last-child{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left;font-variant-numeric:normal}
+th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}
+.tv{display:none;margin-top:14px;border-top:1px solid var(--grid);padding-top:4px}
+.tv.on{display:block}
+
+.hm{display:grid;gap:2px}
+.cell{border-radius:4px;padding:11px 8px;text-align:center;font-size:12.5px;font-weight:600;
+  font-variant-numeric:tabular-nums;cursor:pointer}
+.hmlab{font-size:12px;color:var(--ink2);display:flex;align-items:center;padding-right:10px}
+.scalelegend{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);margin-top:12px}
+.scalelegend .ramp{display:flex;gap:1px}
+.scalelegend .ramp i{width:22px;height:9px;display:block}
+
+.note{font-size:12.5px;color:var(--ink2);border-left:2px solid var(--s1);padding-left:13px;margin:14px 0 0}
+.verdict{font-size:13px;line-height:1.6}
+.verdict b{color:var(--ink)}
+footer{color:var(--muted);font-size:12px;margin-top:28px;border-top:1px solid var(--grid);padding-top:16px}
+h3.sec{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);
+  margin:30px 0 12px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Dukaan Bench<span class="tag" id="prov">v1.0</span></h1>
+    <p class="lede">Can a frontier image model make a <b>usable</b> festival or offer poster —
+      with correct Indic text — for an Indian small business, in one shot?</p>
+  </div>
+  <button class="tbtn" id="theme">Toggle theme</button>
+</header>
+
+<div class="banner" id="banner"></div>
+
+<!-- ONE filter row, scoping every chart below it -->
+<div class="filters">
+  <span class="lbl">SCRIPT</span>
+  <div class="seg" id="fscript"></div>
+  <div class="spacer"></div>
+  <button class="tbtn" id="alltables">Show all table views</button>
+</div>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+  <h2>Usable Poster Rate — would a shop owner post this unedited?</h2>
+  <p class="cap">The headline metric. Bars show the share of images rated postable as-is;
+    whiskers are 95% bootstrap confidence intervals, resampled by rater.
+    <b>Where whiskers overlap, this eval does not separate those models.</b></p>
+  <svg id="c_upr"></svg>
+  <div class="tv" id="t_upr"></div>
+  <button class="tbtn" data-tv="t_upr" style="margin-top:12px">Table view</button>
+</div>
+
+<div class="card">
+  <h2>The Indic Text Penalty</h2>
+  <p class="cap">Each model's text accuracy on the English control poster, versus its average
+    across the nine Indic-script posters. The gap is the penalty. This is the one chart that
+    separates <i>“can't render text”</i> from <i>“can't render <b>this</b> text”</i> — and those
+    two diagnoses point at completely different fixes.</p>
+  <div class="legend">
+    <span><i style="background:var(--s2)"></i>English control (P10)</span>
+    <span><i style="background:var(--s1)"></i>Indic average (P01–P09)</span>
+  </div>
+  <svg id="c_itp"></svg>
+  <div class="tv" id="t_itp"></div>
+  <button class="tbtn" data-tv="t_itp" style="margin-top:12px">Table view</button>
+</div>
+
+<div class="card">
+  <h2>Text fidelity by script — the product argument for India</h2>
+  <p class="cap">Mean text-fidelity score (0–3) per script. Scored only by raters who read that
+    script natively; cells with too few qualified readers are marked. Use the filter above to
+    re-rank the leaderboard for a single script.</p>
+  <div class="hm" id="c_hm"></div>
+  <div class="scalelegend">
+    <span>0 — fake script</span>
+    <span class="ramp"><i style="background:var(--q100)"></i><i style="background:var(--q200)"></i><i style="background:var(--q300)"></i><i style="background:var(--q400)"></i><i style="background:var(--q500)"></i><i style="background:var(--q600)"></i><i style="background:var(--q700)"></i></span>
+    <span>3 — every character correct</span>
+  </div>
+  <p class="note" id="hmnote"></p>
+  <div class="tv" id="t_hm"></div>
+  <button class="tbtn" data-tv="t_hm" style="margin-top:12px">Table view</button>
+</div>
+
+<div class="card">
+  <h2>Head-to-head — and how often nothing was good enough</h2>
+  <p class="cap">For each poster, raters picked the one they would actually use, or
+    <b>“none of these.”</b> Most arena leaderboards force a choice, which manufactures a winner
+    even when every option fails. In a category where failure is the expected outcome, hiding
+    that option would be the single biggest way to produce a misleading leaderboard — so it is
+    shown here at full weight, in neutral ink rather than as a fourth competitor.</p>
+  <svg id="c_h2h"></svg>
+  <div class="tv" id="t_h2h"></div>
+  <button class="tbtn" data-tv="t_h2h" style="margin-top:12px">Table view</button>
+</div>
+
+<div class="card">
+  <h2>Did we measure anything real?</h2>
+  <p class="cap">Reliability of each axis (Krippendorff's α, ordinal). An eval that doesn't
+    publish this is asking to be trusted on faith. Axes below 0.667 are reported as indicative
+    only and never headlined.</p>
+  <div id="rel"></div>
+</div>
+
+<h3 class="sec">How this becomes a product</h3>
+<div class="card">
+  <div class="verdict" id="product"></div>
+</div>
+
+<footer id="foot"></footer>
+</div>
+
+<div id="tip"></div>
+
+<script src="dashboard_data.js" onerror="void 0"></script>
+<script>
+/* =========================================================================
+   Data loading.
+
+   If analyze.py has run, dashboard_data.js defines window.DUKAAN_RESULTS and
+   we use it. Otherwise we fall back to an ILLUSTRATIVE shape so the product
+   design is reviewable before any participants exist — and we say so, loudly,
+   in a banner that cannot be missed. A prototype that silently shows invented
+   numbers as if they were findings is worse than no prototype.
+   ========================================================================= */
+
+const MODEL_ORDER = ['gpt_image_1','gemini_2_5_flash_image','gemini_3_1_flash_image_preview'];
+const MODEL_NAME = {
+  gpt_image_1:'GPT Image 1',
+  gemini_2_5_flash_image:'Gemini 2.5 Flash Image',
+  gemini_3_1_flash_image_preview:'Gemini 3.1 Flash Image Preview'
+};
+const MODEL_CO = {gpt_image_1:'OpenAI', gemini_2_5_flash_image:'Google',
+                  gemini_3_1_flash_image_preview:'Google'};
+/* Colour follows the ENTITY, fixed for the life of the chart — filtering a
+   script must never repaint the survivors. */
+const MODEL_COLOR = {gpt_image_1:'var(--s1)', gemini_2_5_flash_image:'var(--s2)',
+                     gemini_3_1_flash_image_preview:'var(--s3)'};
+
+const PLACEHOLDER = {
+  __placeholder:true,
+  meta:{eval:'Dukaan Bench v1.0', n_raters:0, n_images_rated:0, n_ratings:0},
+  per_model:{
+    gpt_image_1:{model_name:MODEL_NAME.gpt_image_1,company:'OpenAI',upr:null,upr_ci95:[null,null],
+      tf_mean:null,tf_english_control:null,indic_text_penalty:null,ca_mean:null,cu_mean:null,
+      rajasthan_default_rate:null,n_ratings:0},
+    gemini_2_5_flash_image:{model_name:MODEL_NAME.gemini_2_5_flash_image,company:'Google',upr:null,
+      upr_ci95:[null,null],tf_mean:null,tf_english_control:null,indic_text_penalty:null,
+      ca_mean:null,cu_mean:null,rajasthan_default_rate:null,n_ratings:0},
+    gemini_3_1_flash_image_preview:{model_name:MODEL_NAME.gemini_3_1_flash_image_preview,
+      company:'Google',upr:null,upr_ci95:[null,null],tf_mean:null,tf_english_control:null,
+      indic_text_penalty:null,ca_mean:null,cu_mean:null,rajasthan_default_rate:null,n_ratings:0}
+  },
+  per_script:Object.fromEntries(['Devanagari','Tamil','Bengali','Gurmukhi','Telugu','Urdu','Latin']
+    .map(s=>[s,Object.fromEntries(MODEL_ORDER.map(m=>[m,{tf_mean:null,upr:null,n:0,n_tf_scored:0}]))])),
+  head_to_head:{n_decisions:0,none_rate:null,none_count:0,
+    win_rate:Object.fromEntries(MODEL_ORDER.map(m=>[m,null])),
+    win_count:Object.fromEntries(MODEL_ORDER.map(m=>[m,0]))},
+  reliability:{krippendorff_alpha:{tf:null,ca:null,cu:null,upr:null},
+    duplicate_screen:{}, ground_truth:{status:'not yet run'}}
+};
+
+const R = (window.DUKAAN_RESULTS && window.DUKAAN_RESULTS.per_model) ? window.DUKAAN_RESULTS : PLACEHOLDER;
+const EMPTY = !!R.__placeholder || !R.meta.n_raters;
+
+let scriptFilter = 'all';
+
+/* ---------- formatting ---------- */
+const pct = v => v===null||v===undefined ? '—' : (v*100).toFixed(0)+'%';
+const n2  = v => v===null||v===undefined ? '—' : (+v).toFixed(2);
+const $   = id => document.getElementById(id);
+
+/* ---------- banner ---------- */
+$('banner').innerHTML = EMPTY
+  ? `<b>⚠ No results loaded — this is a design prototype, not findings.</b><br>
+     Every number below is blank on purpose. Run
+     <code>analyze.py</code> and it writes <code>dashboard_data.js</code> next to this file;
+     reload and the real numbers appear. <b>Nothing here is invented data.</b>`
+  : `<b>Live results</b> — ${R.meta.n_raters} raters · ${R.meta.n_images_rated} images ·
+     ${R.meta.n_ratings} ratings. Confidence intervals are wide at this sample size;
+     read the whiskers, not the point estimates.`;
+$('prov').textContent = EMPTY ? 'PROTOTYPE' : 'v1.0';
+if(EMPTY) $('prov').style.cssText = 'color:var(--crit);border-color:var(--crit)';
+
+/* ---------- filter ---------- */
+const scripts = Object.keys(R.per_script||{});
+$('fscript').innerHTML = ['all',...scripts].map(s=>
+  `<button data-s="${s}" class="${s==='all'?'on':''}">${s==='all'?'All scripts':s}</button>`).join('');
+$('fscript').onclick = e => {
+  const b = e.target.closest('button[data-s]'); if(!b) return;
+  scriptFilter = b.dataset.s;
+  [...$('fscript').children].forEach(c=>c.classList.toggle('on', c===b));
+  renderAll();
+};
+
+/* Pull the right slice for the current filter. */
+function modelRow(mk){
+  const base = R.per_model[mk] || {};
+  if(scriptFilter==='all') return base;
+  const cell = (R.per_script[scriptFilter]||{})[mk] || {};
+  return {...base, upr:cell.upr ?? null, upr_ci95:[null,null],
+          tf_mean:cell.tf_mean ?? null, _scoped:true, n_ratings:cell.n ?? 0};
+}
+
+/* ---------- tooltip ---------- */
+const tip = $('tip');
+function showTip(e, title, rows){
+  tip.innerHTML = `<b>${title}</b>` + rows.map(([k,v])=>
+    `<div class="r"><span>${k}</span><span>${v}</span></div>`).join('');
+  tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.min(e.clientX+14, innerWidth-r.width-12)+'px';
+  tip.style.top  = Math.max(10, e.clientY-r.height-10)+'px';
+}
+const hideTip = () => tip.style.opacity = 0;
+
+/* ---------- tiles ---------- */
+function renderTiles(){
+  const rows = MODEL_ORDER.map(mk=>({mk,...modelRow(mk)}));
+  const withUpr = rows.filter(r=>r.upr!==null);
+  const best = withUpr.length ? withUpr.reduce((a,b)=>b.upr>a.upr?b:a) : null;
+  const itps = MODEL_ORDER.map(mk=>R.per_model[mk]?.indic_text_penalty).filter(v=>v!==null&&v!==undefined);
+  const worst = itps.length ? Math.max(...itps) : null;
+  const nQual = scriptFilter==='all'
+    ? Object.values(R.per_script||{}).reduce((a,sc)=>a+Object.values(sc).reduce((x,c)=>x+(c.n_tf_scored||0),0),0)
+    : Object.values(R.per_script[scriptFilter]||{}).reduce((x,c)=>x+(c.n_tf_scored||0),0);
+
+  const tiles = [
+    ['Best usable rate', best? pct(best.upr):'—',
+      best? MODEL_NAME[best.mk] : 'awaiting ratings'],
+    ['“None of these”', pct(R.head_to_head?.none_rate),
+      R.head_to_head?.n_decisions ? `of ${R.head_to_head.n_decisions} decisions` : 'awaiting ratings'],
+    ['Largest Indic penalty', worst!==null? n2(worst)+' pts':'—', 'on a 0–3 text scale'],
+    ['Scripts under test', String(scripts.length), `${nQual} script-qualified text ratings`]
+  ];
+  $('tiles').innerHTML = tiles.map(([k,v,n])=>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
+}
+
+/* ---------- chart 1: UPR bars + CI whiskers ---------- */
+function renderUPR(){
+  const rows = MODEL_ORDER.map(mk=>({mk,...modelRow(mk)}))
+    .sort((a,b)=>(b.upr??-1)-(a.upr??-1));
+  const L=250, Rp=60, bh=30, gap=22, top=26;
+  const H = top + rows.length*(bh+gap) + 36;
+  const W = 900, pw = W-L-Rp;
+  const x = v => L + Math.max(0,Math.min(1,v))*pw;
+
+  let s=`<svg id="c_upr" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Usable Poster Rate by model, with 95% confidence intervals">`;
+  // gridlines: solid hairlines, recessive
+  for(let t=0;t<=1.0001;t+=0.25){
+    s+=`<line class="gl" x1="${x(t)}" y1="${top-8}" x2="${x(t)}" y2="${H-30}"/>
+        <text class="tick" x="${x(t)}" y="${H-12}" text-anchor="middle">${(t*100).toFixed(0)}%</text>`;
+  }
+  s+=`<line class="ax" x1="${L}" y1="${top-8}" x2="${L}" y2="${H-30}"/>`;
+
+  rows.forEach((r,i)=>{
+    const y = top + i*(bh+gap);
+    s+=`<text class="catlab" x="0" y="${y+13}">${MODEL_NAME[r.mk]}</text>
+        <text class="sublab" x="0" y="${y+28}">${MODEL_CO[r.mk]}${r._scoped?' · '+scriptFilter:''}</text>`;
+    if(r.upr===null){
+      s+=`<text class="sublab" x="${L+6}" y="${y+19}">no ratings yet</text>`;
+    } else {
+      const w = Math.max(2, x(r.upr)-L);
+      // 4px rounded data-end anchored to the baseline
+      s+=`<path d="M${L},${y} H${L+w-4} a4,4 0 0 1 4,4 V${y+bh-4} a4,4 0 0 1 -4,4 H${L} Z"
+            fill="${MODEL_COLOR[r.mk]}"/>`;
+      const ci=r.upr_ci95||[];
+      if(ci[0]!==null&&ci[0]!==undefined){
+        const a=x(ci[0]), b=x(ci[1]), cy=y+bh/2;
+        s+=`<line x1="${a}" y1="${cy}" x2="${b}" y2="${cy}" stroke="var(--ink)" stroke-width="1.5" opacity=".75"/>
+            <line x1="${a}" y1="${cy-6}" x2="${a}" y2="${cy+6}" stroke="var(--ink)" stroke-width="1.5" opacity=".75"/>
+            <line x1="${b}" y1="${cy-6}" x2="${b}" y2="${cy+6}" stroke="var(--ink)" stroke-width="1.5" opacity=".75"/>`;
+      }
+      // selective direct label — the value, outside the bar end
+      s+=`<text class="vlab" x="${x(r.upr)+ (ci[1]!=null? (x(ci[1])-x(r.upr))+10 : 10)}" y="${y+bh/2+4}">${pct(r.upr)}</text>`;
+    }
+    s+=`<rect class="hit" x="0" y="${y-8}" width="${W}" height="${bh+16}"
+          data-mk="${r.mk}" data-kind="upr"/>`;
+  });
+  s+='</svg>';
+  $('c_upr').outerHTML = s;
+  bindHits('c_upr');
+
+  $('t_upr').innerHTML = table(
+    ['Model','Company','UPR','95% CI low','95% CI high','n ratings'],
+    rows.map(r=>[MODEL_NAME[r.mk],MODEL_CO[r.mk],pct(r.upr),
+      pct(r.upr_ci95?.[0]),pct(r.upr_ci95?.[1]),r.n_ratings||0]));
+}
+
+/* ---------- chart 2: ITP dumbbell ----------
+   A dumbbell, not a grouped bar: the quantity of interest IS the gap, and a
+   dumbbell encodes the gap as length directly instead of asking the reader to
+   subtract two bar heights. */
+function renderITP(){
+  const rows = MODEL_ORDER.map(mk=>({mk,...(R.per_model[mk]||{})}));
+  const L=250, Rp=70, rowH=54, top=24;
+  const W=900, H=top+rows.length*rowH+34, pw=W-L-Rp;
+  const x = v => L + (Math.max(0,Math.min(3,v))/3)*pw;
+
+  let s=`<svg id="c_itp" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Text fidelity on English control versus Indic average, per model">`;
+  for(let t=0;t<=3.0001;t+=0.5){
+    s+=`<line class="gl" x1="${x(t)}" y1="${top-6}" x2="${x(t)}" y2="${H-28}"/>
+        <text class="tick" x="${x(t)}" y="${H-10}" text-anchor="middle">${t.toFixed(1)}</text>`;
+  }
+  s+=`<line class="ax" x1="${L}" y1="${top-6}" x2="${L}" y2="${H-28}"/>`;
+
+  rows.forEach((r,i)=>{
+    const y=top+i*rowH+rowH/2-6;
+    s+=`<text class="catlab" x="0" y="${y-2}">${MODEL_NAME[r.mk]}</text>`;
+    if(r.tf_mean===null||r.tf_mean===undefined||r.tf_english_control===null||r.tf_english_control===undefined){
+      s+=`<text class="sublab" x="0" y="${y+14}">awaiting ratings</text>`;
+    } else {
+      const a=x(r.tf_mean), b=x(r.tf_english_control);
+      s+=`<text class="sublab" x="0" y="${y+14}">penalty ${n2(r.indic_text_penalty)} pts</text>
+          <line x1="${a}" y1="${y}" x2="${b}" y2="${y}" stroke="var(--axis)" stroke-width="2"/>
+          <circle cx="${b}" cy="${y}" r="6" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"/>
+          <circle cx="${a}" cy="${y}" r="6" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>
+          <text class="vlab" x="${Math.max(a,b)+14}" y="${y+4}">${n2(r.indic_text_penalty)}</text>`;
+    }
+    s+=`<rect class="hit" x="0" y="${top+i*rowH}" width="${W}" height="${rowH}"
+          data-mk="${r.mk}" data-kind="itp"/>`;
+  });
+  s+='</svg>';
+  $('c_itp').outerHTML=s;
+  bindHits('c_itp');
+
+  $('t_itp').innerHTML = table(
+    ['Model','TF — Indic avg','TF — English control','Indic Text Penalty'],
+    rows.map(r=>[MODEL_NAME[r.mk],n2(r.tf_mean),n2(r.tf_english_control),n2(r.indic_text_penalty)]));
+}
+
+/* ---------- chart 3: sequential heatmap ---------- */
+function renderHM(){
+  const ramp=['--q100','--q200','--q300','--q400','--q500','--q600','--q700'];
+  const colorFor = v => {
+    if(v===null||v===undefined) return null;
+    return ramp[Math.min(ramp.length-1, Math.max(0, Math.round((v/3)*(ramp.length-1))))];
+  };
+  const el=$('c_hm');
+  el.style.gridTemplateColumns = `150px repeat(${MODEL_ORDER.length},1fr)`;
+  let h = `<div></div>` + MODEL_ORDER.map(mk=>
+    `<div class="hmlab" style="justify-content:center;font-weight:600;text-align:center">
+       ${MODEL_NAME[mk].replace(' Flash Image','')}</div>`).join('');
+  let thin=0;
+  for(const sc of scripts){
+    h += `<div class="hmlab">${sc}${sc==='Latin'?' <span class="sublab" style="margin-left:5px">control</span>':''}</div>`;
+    for(const mk of MODEL_ORDER){
+      const c = (R.per_script[sc]||{})[mk]||{};
+      const v = c.tf_mean, tok = colorFor(v);
+      const few = (c.n_tf_scored||0) > 0 && (c.n_tf_scored||0) < 4;
+      if(few) thin++;
+      const dark = v!==null&&v!==undefined && v/3 > 0.45;
+      h += `<div class="cell" style="background:${tok?`var(${tok})`:'var(--grid)'};
+              color:${tok? (dark?'#fff':'var(--ink)') : 'var(--muted)'}"
+              data-sc="${sc}" data-mk="${mk}" data-kind="hm">
+              ${v===null||v===undefined?'—':n2(v)}${few?' *':''}</div>`;
+    }
+  }
+  el.innerHTML=h;
+  el.onmousemove = e => {
+    const c=e.target.closest('.cell[data-kind=hm]'); if(!c) return hideTip();
+    const cell=(R.per_script[c.dataset.sc]||{})[c.dataset.mk]||{};
+    showTip(e, `${c.dataset.sc} — ${MODEL_NAME[c.dataset.mk]}`, [
+      ['Text fidelity (0–3)', n2(cell.tf_mean)],
+      ['Usable poster rate', pct(cell.upr)],
+      ['Ratings in cell', cell.n||0],
+      ['Script-qualified text ratings', cell.n_tf_scored||0]]);
+  };
+  el.onmouseleave = hideTip;
+
+  $('hmnote').innerHTML = thin
+    ? `<b>* ${thin} cell(s) rest on fewer than 4 script-qualified readers.</b> Treat those as
+       anecdote, not measurement — the honest limit of a 10-person panel is that minority
+       scripts get thin coverage. Fixing it is a recruitment problem, not a statistics problem.`
+    : `Only raters who read a script natively scored its text, and
+       <b>“I can't read this script”</b> was a first-class answer. A Hindi reader guessing at
+       Tamil spelling produces numbers that look like data and aren't.`;
+
+  $('t_hm').innerHTML = table(
+    ['Script',...MODEL_ORDER.map(mk=>MODEL_NAME[mk]),'Qualified ratings'],
+    scripts.map(sc=>[sc, ...MODEL_ORDER.map(mk=>n2((R.per_script[sc]||{})[mk]?.tf_mean)),
+      MODEL_ORDER.reduce((a,mk)=>a+((R.per_script[sc]||{})[mk]?.n_tf_scored||0),0)]));
+}
+
+/* ---------- chart 4: head-to-head share ---------- */
+function renderH2H(){
+  const h=R.head_to_head||{};
+  const segs = MODEL_ORDER.map(mk=>({label:MODEL_NAME[mk], v:h.win_rate?.[mk],
+      fill:MODEL_COLOR[mk], count:h.win_count?.[mk]}))
+    .concat([{label:'None of these', v:h.none_rate, fill:'var(--axis)', count:h.none_count, none:true}]);
+  const any = segs.some(s=>s.v!==null&&s.v!==undefined);
+  const W=900, H=132, L=0, bh=42, top=34;
+
+  let s=`<svg id="c_h2h" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Share of head-to-head decisions won by each model, and share where none were good enough">`;
+  if(!any){
+    s+=`<text class="sublab" x="0" y="${top+24}">Awaiting ratings — no decisions recorded yet.</text>`;
+  } else {
+    let acc=0;
+    segs.forEach(sg=>{
+      const v=sg.v||0, w=v*W;
+      if(w>0){
+        // 2px surface gap between adjacent fills, not a border
+        s+=`<rect x="${acc+1}" y="${top}" width="${Math.max(0,w-2)}" height="${bh}"
+              fill="${sg.fill}" rx="3"/>`;
+        // only label inside the mark when it fits with padding
+        if(w>58) s+=`<text x="${acc+w/2}" y="${top+bh/2+5}" text-anchor="middle"
+            style="fill:${sg.none?'var(--ink)':'#fff'};font-size:12.5px;font-weight:700">${pct(v)}</text>`;
+        s+=`<rect class="hit" x="${acc}" y="${top-10}" width="${w}" height="${bh+20}"
+              data-h2h="${sg.label}" data-kind="h2h"/>`;
+      }
+      acc+=w;
+    });
+    s+=`<text class="sublab" x="0" y="${top+bh+26}">${h.n_decisions} decisions · one per rater per poster</text>`;
+  }
+  s+='</svg>';
+  $('c_h2h').outerHTML=s;
+
+  const el=$('c_h2h');
+  el.onmousemove = e => {
+    const t=e.target.closest('[data-kind=h2h]'); if(!t) return hideTip();
+    const sg=segs.find(x=>x.label===t.dataset.h2h);
+    showTip(e, sg.label, [['Share of decisions',pct(sg.v)],['Decisions',sg.count||0]]);
+  };
+  el.onmouseleave=hideTip;
+
+  $('t_h2h').innerHTML = table(['Choice','Share','Decisions'],
+    segs.map(sg=>[sg.label,pct(sg.v),sg.count||0]));
+}
+
+/* ---------- reliability ---------- */
+function renderRel(){
+  const a=R.reliability?.krippendorff_alpha||{};
+  const verdict = v => v===null||v===undefined ? ['not computable','var(--muted)']
+    : v>=0.80 ? ['strong — reliable','var(--good)']
+    : v>=0.667? ['acceptable','var(--good)']
+    : v>=0.50 ? ['weak — indicative only','var(--warn)']
+    : ['poor — do not conclude','var(--crit)'];
+  const names={tf:'Text fidelity',ca:'Cultural authenticity',cu:'Poster usability',upr:'Would post it'};
+  $('rel').innerHTML = table(['Axis','Krippendorff α','Verdict'],
+    Object.keys(names).map(k=>{
+      const [txt,col]=verdict(a[k]);
+      return [names[k], a[k]===null||a[k]===undefined?'—':(+a[k]).toFixed(3),
+        `<span style="color:${col};font-weight:600">${txt}</span>`];
+    })) + `<p class="note">The agreement number is part of the result. An eval that reports
+      scores but hides whether its judges agreed is asking to be trusted on faith.
+      Ground-truth validation: <b>${R.reliability?.ground_truth?.status||'not yet run'}</b>.</p>`;
+}
+
+/* ---------- product thesis ---------- */
+$('product').innerHTML = `
+  <p style="margin-top:0"><b>One global leaderboard is the wrong product for India.</b>
+  Use the script filter above and the ranking changes. A model that leads on Devanagari can
+  sit at the floor on Tamil or Gurmukhi — so a single "best image model" badge actively
+  misinforms a Chennai or Amritsar business owner. The per-script view is the product; the
+  global average is the marketing.</p>
+
+  <p><b>Three surfaces, one pipeline.</b>
+  <i>This leaderboard</i> is the public artefact that makes the gap citable.
+  <i>The rating tool</i> is the collection surface, and it is already the shape of a Josh Jobs
+  task — a blinded triad, four taps, under two minutes.
+  <i>A failure explorer</i> (next build) lets a model team filter to every image tagged
+  <code>rajasthan-default</code> or scored 0 on text and see the actual failures, because a
+  leaderboard tells a lab <i>that</i> it lost and an example tells it <i>why</i>.</p>
+
+  <p><b>What makes this defensible rather than just another arena.</b> Josh Jobs already has
+  ~20,000 daily active transcribers spread across 25+ languages — which is exactly the panel
+  this eval needs and is the single hardest thing for anyone else to assemble. Script-qualified
+  raters at scale are the moat; the leaderboard is just the visible end of it.</p>`;
+
+$('foot').innerHTML = `Dukaan Bench ${EMPTY?'— design prototype, no results loaded':'v1.0'}
+  · Categorical hues are the dataviz reference palette's first three slots, used unchanged and
+  all-pairs validated in both modes · sequential heatmap on a single blue ramp
+  · every chart ships a table view · no dual-axis charts
+  · colour follows the model, so filtering never repaints the survivors.`;
+
+/* ---------- plumbing ---------- */
+function table(head, rows){
+  return `<div style="overflow:auto"><table><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>
+    ${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`;
+}
+function bindHits(id){
+  const el=$(id);
+  el.onmousemove = e => {
+    const t=e.target.closest('.hit[data-mk]'); if(!t) return hideTip();
+    const mk=t.dataset.mk, kind=t.dataset.kind;
+    const m=modelRow(mk), g=R.per_model[mk]||{};
+    showTip(e, MODEL_NAME[mk], kind==='upr'
+      ? [['Company',MODEL_CO[mk]],['Usable poster rate',pct(m.upr)],
+         ['95% CI',m.upr_ci95?.[0]!=null?`${pct(m.upr_ci95[0])} – ${pct(m.upr_ci95[1])}`:'—'],
+         ['Text fidelity',n2(m.tf_mean)],['Cultural authenticity',n2(g.ca_mean)],
+         ['Poster usability',n2(g.cu_mean)],['Rajasthan default',pct(g.rajasthan_default_rate)]]
+      : [['Indic average',n2(g.tf_mean)],['English control',n2(g.tf_english_control)],
+         ['Penalty',n2(g.indic_text_penalty)]]);
+  };
+  el.onmouseleave = hideTip;
+}
+document.body.addEventListener('click', e=>{
+  const b=e.target.closest('[data-tv]'); if(!b) return;
+  const t=$(b.dataset.tv); t.classList.toggle('on');
+  b.textContent = t.classList.contains('on') ? 'Hide table' : 'Table view';
+});
+$('alltables').onclick = () => {
+  const on = [...document.querySelectorAll('.tv')].some(t=>!t.classList.contains('on'));
+  document.querySelectorAll('.tv').forEach(t=>t.classList.toggle('on',on));
+  document.querySelectorAll('[data-tv]').forEach(b=>b.textContent=on?'Hide table':'Table view');
+  $('alltables').textContent = on ? 'Hide all table views' : 'Show all table views';
+};
+$('theme').onclick = () => {
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next = cur==='dark' ? 'light' : cur==='light' ? 'dark'
+    : (matchMedia('(prefers-color-scheme:dark)').matches ? 'light' : 'dark');
+  document.documentElement.setAttribute('data-theme',next);
+  renderAll();
+};
+
+function renderAll(){ renderTiles(); renderUPR(); renderITP(); renderHM(); renderH2H(); renderRel(); }
+renderAll();
+</script>
+</body>
+</html>

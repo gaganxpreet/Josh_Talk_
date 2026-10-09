@@ -1,0 +1,20 @@
+# Local secrets and Python artifacts
+**/.env
+!**/.env.example
+__pycache__/
+*.py[cod]
+
+# Internal preparation and participant-identifying material
+/SUBMISSION_CHECKLIST.md
+/Q1_dukaan_bench/rating/CONSENT_FORM.md
+/Q1_dukaan_bench/evidence/consent/
+/Q1_dukaan_bench/rating/responses/*.csv
+
+# Synthetic fixtures and generated Q1 outputs; publish outputs only after
+# rerunning analysis with real ratings and verifying every table.
+/Q1_dukaan_bench/rating/responses_synthetic/
+/Q1_dukaan_bench/analysis/results.json
+/Q1_dukaan_bench/analysis/RESULTS.md
+/Q1_dukaan_bench/dashboard/dashboard_data.js
+/Q2_transcriber_quality/analysis/synthetic_tasks.csv
+/Q2_transcriber_quality/analysis/tasks.csv
